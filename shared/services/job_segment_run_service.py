@@ -102,7 +102,9 @@ class JobSegmentRunService:
         segment_id: int,
         camera: CameraType,
         status: JobSegmentRunStatus,
+        error: str | None = None,
     ) -> JobSegmentRun:
+        """Set the status. Pass ``error`` to record why this segment failed (only written when given)."""
         segment_run = await self._job_segment_run_repository.get_by_id(
             job_run_num=job_run_num,
             job_def_id=job_def_id,
@@ -118,6 +120,8 @@ class JobSegmentRunService:
                 segment_id=segment_id,
             )
         segment_run.status = status
+        if error is not None:
+            segment_run.error = error
         return await self._job_segment_run_repository.save(segment_run)
 
     async def set_artifact(

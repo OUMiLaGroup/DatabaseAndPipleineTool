@@ -128,7 +128,36 @@ class JobRunService:
             )
 
         job_run.error = error
-        job_run.status = JobStatus.FAILED 
+        job_run.status = JobStatus.FAILED
+        # A failed run is finished; without this the UI showed failed runs with no end time
+        job_run.finished_at = datetime.now(timezone.utc)
+        return await self._job_run_repository.save(job_run)
+
+    async def set_warning(
+        self,
+        job_run_num: int,
+        job_def_id: int,
+        route_id: str,
+        camera: CameraType,
+        warning: str | None,
+    ) -> JobRun:
+        """Store a message in ``error`` without changing the status.
+
+        Used when a job run succeeded overall but some segments failed.
+        """
+        job_run = await self._job_run_repository.get_by_id(
+            job_run_num=job_run_num,
+            job_def_id=job_def_id,
+            route_id=route_id,
+            camera=camera
+        )
+        if job_run is None:
+            raise JobRunNotFoundError(
+                job_run_num=job_run_num,
+                job_def_id=job_def_id,
+                route_id=route_id
+            )
+        job_run.error = warning
         return await self._job_run_repository.save(job_run)
 
     async def set_stats(

@@ -1,6 +1,5 @@
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
-import logging
 from pathlib import Path
 import shutil
 import signal
@@ -30,30 +29,75 @@ from services.minio_service import MinioService
 from services.segment_artifact_download_service import SegmentArtifactDownloadService
 from services.segment_service import SegmentService
 from utilities.cvat_utilities import get_task_url
+from services.audit_service import (
+    OUTCOME_FAILURE,
+    OUTCOME_SUCCESS,
+    configure_audit,
+    entity_id_for,
+    record_audit,
+)
+from utilities.error_utilities import describe_exception, error_code_of, record_failure
+from utilities.logging_utilities import configure_logging
 
 
 POLL_INTERVAL_SECONDS = 1.0
 DATA_DIR = Path("/app/cvat_share")
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
+logger = configure_logging("cvat_import_export_worker")
+
+STALE_IMPORT_ERROR = (
+    "The cvat_import_export_worker restarted while this was {action}, so it was stopped. "
+    "| How to fix: Try the CVAT action again from the segment page."
 )
-logger = logging.getLogger(__name__)
+
+
+def _import_ids(job_segment_run_import: JobSegmentRunImport) -> dict:
+    """Plain IDs of an import, safe to use after a session rollback."""
+    return dict(
+        job_run_num=job_segment_run_import.job_run_num,
+        job_def_id=job_segment_run_import.job_def_id,
+        route_id=job_segment_run_import.route_id,
+        segment_id=job_segment_run_import.segment_id,
+        camera=job_segment_run_import.camera,
+    )
+
+
+async def _audit_import(action: str, outcome: str, ids: dict, message: str | None = None, error_code: str | None = None, details: dict | None = None) -> None:
+    await record_audit(
+        action,
+        outcome,
+        entity_type="cvat_import",
+        entity_id=entity_id_for("cvat_import", ids),
+        route_id=ids["route_id"],
+        message=message,
+        error_code=error_code,
+        details={**{k: str(v) for k, v in ids.items()}, **(details or {})},
+    )
+
+
+def _import_label(ids: dict) -> str:
+    return (
+        f"cvat_import(route={ids['route_id']} segment={ids['segment_id']} "
+        f"job_def={ids['job_def_id']} run={ids['job_run_num']} camera={ids['camera']})"
+    )
 
 async def _mark_stale_running_jobs_as_failed(job_segment_run_import_service: JobSegmentRunImportService):
-    logging.info("Marking stale running jobs as failed")
-    stale_jobs = await job_segment_run_import_service.get_by_status(status=JobSegmentRunImportStatus.LOADING)
-    for job in stale_jobs:
-        logger.warning(f"Stale job: {job} marked as FAILED")
-
-    stale_jobs = await job_segment_run_import_service.get_by_status(status=JobSegmentRunImportStatus.REMOVING)
-    for job in stale_jobs:
-        logger.warning(f"Stale job: {job} marked as FAILED")
-        await job_segment_run_import_service.set_error(
-            job_segment_run_import=job,
-            error_message="Import job has status 'RUNNING' after worker restart. Marking as stale"
-        )
+    logger.info("Marking stale running jobs as failed")
+    for status, action in (
+        (JobSegmentRunImportStatus.LOADING, "loading into CVAT"),
+        (JobSegmentRunImportStatus.REMOVING, "being removed from CVAT"),
+    ):
+        stale_jobs = await job_segment_run_import_service.get_by_status(status=status)
+        for job in stale_jobs:
+            logger.warning("Stale %s (status %s) marked as FAILED", _import_label(_import_ids(job)), status)
+            await job_segment_run_import_service.set_error(
+                job_segment_run_import=job,
+                error_message=STALE_IMPORT_ERROR.format(action=action),
+            )
+            await _audit_import(
+                "cvat.import.interrupted", OUTCOME_FAILURE, _import_ids(job),
+                message=STALE_IMPORT_ERROR.format(action=action),
+            )
 
     logger.info("Completed marking stale running jobs as failed.")
 
@@ -66,21 +110,16 @@ async def _process_loading_job(
     job_segment_artifact_downloader_service: JobSegmentArtifactDownloaderService,
     session: AsyncSession
 ):
-    logging.info(f"Processing loading job {job_segment_run_import}")
-    await job_segment_run_import_service.set_status(
-        job_run_num=job_segment_run_import.job_run_num,
-        job_def_id=job_segment_run_import.job_def_id,
-        route_id=job_segment_run_import.route_id,
-        segment_id=job_segment_run_import.segment_id,
-        camera=job_segment_run_import.camera,
-        status=JobSegmentRunImportStatus.LOADING
-    )
-    await session.commit()
-
+    ids = _import_ids(job_segment_run_import)
+    label = _import_label(ids)
+    logger.info("Loading into CVAT: %s", label)
 
     unique_folder_name = str(uuid4())
     dest_path = DATA_DIR / unique_folder_name
     try:
+        await job_segment_run_import_service.set_status(**ids, status=JobSegmentRunImportStatus.LOADING)
+        await session.commit()
+
         # Download job run info from minio
         job_segment_run = await job_segment_run_service.get_job_segment_run(
             job_run_num=job_segment_run_import.job_run_num,
@@ -125,15 +164,21 @@ async def _process_loading_job(
             status=JobSegmentRunImportStatus.LOADED
         )
         await session.commit()
+        logger.info("Loaded into CVAT: %s (task %s)", label, task_id)
+        await _audit_import("cvat.load_segment.finished", OUTCOME_SUCCESS, ids, details={"task_id": task_id})
     except Exception as e:
-        logging.error(f"Job loading failed: {job_segment_run_import}", e)
-        await job_segment_run_import_service.set_error(
-            job_segment_run_import=job_segment_run_import,
-            error_message=f"Failed while loading into cvat: {type(e)}, {e}"
+        error = f"Failed while loading into CVAT: {describe_exception(e)}"
+        logger.exception("Loading into CVAT failed: %s", label)
+        await record_failure(
+            session,
+            logger,
+            label,
+            lambda: job_segment_run_import_service.mark_failed(**ids, error_message=error),
         )
-        await session.commit()
+        await _audit_import("cvat.load_segment.finished", OUTCOME_FAILURE, ids, message=error, error_code=error_code_of(e))
     finally:
-        shutil.rmtree(dest_path)
+        # The folder may not exist if the failure happened before the download
+        shutil.rmtree(dest_path, ignore_errors=True)
 
 async def _process_removal_job(
     job_segment_run_import:JobSegmentRunImport,
@@ -141,22 +186,17 @@ async def _process_removal_job(
     cvat_service:CVATService,
     session: AsyncSession
 ):
-    logging.info(f"Processing loading job {job_segment_run_import}")
-    await job_segment_run_import_service.set_status(
-        job_run_num=job_segment_run_import.job_run_num,
-        job_def_id=job_segment_run_import.job_def_id,
-        route_id=job_segment_run_import.route_id,
-        segment_id=job_segment_run_import.segment_id,
-        camera=job_segment_run_import.camera,
-        status=JobSegmentRunImportStatus.REMOVING
-    )
-    await session.commit()
-
+    ids = _import_ids(job_segment_run_import)
+    label = _import_label(ids)
+    logger.info("Removing from CVAT: %s", label)
 
     try:
+        await job_segment_run_import_service.set_status(**ids, status=JobSegmentRunImportStatus.REMOVING)
+        await session.commit()
+
         # Try to remove job from CVAT
         if not job_segment_run_import.task_id:
-            raise ValueError(f"Job segment run import does not have a task id: {job_segment_run_import}")
+            raise ValueError(f"{label} has no CVAT task id, so there is nothing to remove")
 
         cvat_service.delete_task(
             task_id=job_segment_run_import.task_id
@@ -171,13 +211,18 @@ async def _process_removal_job(
             status=JobSegmentRunImportStatus.REMOVED
         )
         await session.commit()
+        logger.info("Removed from CVAT: %s", label)
+        await _audit_import("cvat.remove_segment.finished", OUTCOME_SUCCESS, ids)
     except Exception as e:
-        logging.error(f"Job loading failed: {job_segment_run_import}", e)
-        await job_segment_run_import_service.set_error(
-            job_segment_run_import=job_segment_run_import,
-            error_message=f"Failed while removing from cvat: {type(e)}, {e}"
+        error = f"Failed while removing from CVAT: {describe_exception(e)}"
+        logger.exception("Removing from CVAT failed: %s", label)
+        await record_failure(
+            session,
+            logger,
+            label,
+            lambda: job_segment_run_import_service.mark_failed(**ids, error_message=error),
         )
-        await session.commit()
+        await _audit_import("cvat.remove_segment.finished", OUTCOME_FAILURE, ids, message=error, error_code=error_code_of(e))
 
 async def _process_job(
     job_segment_run_import:JobSegmentRunImport,
@@ -187,7 +232,7 @@ async def _process_job(
     cvat_service:CVATService,
     session: AsyncSession
 ):
-    logging.info(f"Processing {job_segment_run_import}")
+    logger.info("Processing %s", _import_label(_import_ids(job_segment_run_import)))
     if job_segment_run_import.status == JobSegmentRunImportStatus.QUEUED_FOR_LOADING:
         await _process_loading_job(
             job_segment_run_import=job_segment_run_import,
@@ -215,6 +260,7 @@ async def main():
         pool_pre_ping=True
     )
     SessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
+    configure_audit(SessionLocal, source="cvat_import_export_worker")
 
     stop_event = asyncio.Event()
     executor = ThreadPoolExecutor(max_workers=1)
@@ -265,7 +311,7 @@ async def main():
             await session.commit()
 
             while not stop_event.is_set():
-                logging.info("Checking for queues job segment run imports")
+                logger.debug("Checking for queued job segment run imports")
                 job_segment_run_import = await job_segment_run_import_service.get_next_by_statuses(statuses=[JobSegmentRunImportStatus.QUEUED_FOR_LOADING, JobSegmentRunImportStatus.QUEUED_FOR_REMOVAL])
 
                 if job_segment_run_import is None:

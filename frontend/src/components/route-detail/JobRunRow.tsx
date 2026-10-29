@@ -2,10 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import type { JobRun } from "../../api/types";
 import { formatCamera, formatRelativeTime } from "../../utils/formatters";
 import { listJobDefinitions } from "../../api/job_definitions";
+import { listJobRunsForRoute } from "../../api/job_runs";
 import { STATUS_COLOR, STATUS_LABEL } from "../../utils/jobSegmentRunConfig";
 import { ExportJobRunButton } from "./ExportJobRunButton";
 import { DeleteJobRunButton } from "./DeleteJobRunButton";
 import { RequeueJobRunButton } from "./RequeueJobRunButton";
+import { FailureReason } from "../FailureReason";
 
 export function JobRunRow({ jobRun }: { jobRun: JobRun }) {
   const color = STATUS_COLOR[jobRun.status as keyof typeof STATUS_COLOR] ?? "var(--text-secondary)";
@@ -17,9 +19,18 @@ export function JobRunRow({ jobRun }: { jobRun: JobRun }) {
     queryFn: listJobDefinitions,
   });
   const defName = jobDefs.find((d) => d.id === jobRun.jobDefId)?.name ?? `def ${jobRun.jobDefId}`;
+  const { data: routeRuns = [] } = useQuery({
+    queryKey: ["depth-companions", jobRun.routeId],
+    queryFn: () => listJobRunsForRoute(jobRun.routeId),
+    refetchInterval: 5000,
+  });
+  const depthRun = routeRuns.filter((run) => run.status === "succeeded" && run.camera === jobRun.camera &&
+    jobDefs.find((definition) => definition.id === run.jobDefId)?.type === "depth")
+    .sort((a, b) => (b.finishedAt ?? "").localeCompare(a.finishedAt ?? ""))[0];
+  const supportsDepth = jobDefs.find((definition) => definition.id === jobRun.jobDefId)?.type === "object_detection";
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "calc(var(--space-2) + 1px) var(--space-3)", backgroundColor: "var(--bg-on-inverse-subtle)", border: "1px solid var(--border-on-inverse-faint)" }}>
+    <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-3)", padding: "calc(var(--space-2) + 1px) var(--space-3)", backgroundColor: "var(--bg-on-inverse-subtle)", border: "1px solid var(--border-on-inverse-faint)" }}>
       <DeleteJobRunButton
         routeId={jobRun.routeId}
         jobDefId={jobRun.jobDefId}
@@ -40,9 +51,8 @@ export function JobRunRow({ jobRun }: { jobRun: JobRun }) {
         {isActive ? `queued ${formatRelativeTime(jobRun.queuedAt)}` : formatRelativeTime(jobRun.finishedAt)}
       </span>
       {jobRun.error && (
-        <span style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--accent-alert)", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={jobRun.error}>
-          {jobRun.error}
-        </span>
+        // A succeeded run can still carry a warning, e.g. "2 of 10 segments failed"
+        <FailureReason text={jobRun.error} tone={jobRun.status === "failed" ? "alert" : "warning"} dark maxWidth="220px" />
       )}
       {jobRun.status === "cancelled" && (
         <RequeueJobRunButton
@@ -59,6 +69,11 @@ export function JobRunRow({ jobRun }: { jobRun: JobRun }) {
         camera={jobRun.camera}
         jobSucceeded={jobRun.status === "succeeded"}
       />
+      {supportsDepth && depthRun && jobRun.status === "succeeded" && <ExportJobRunButton
+        routeId={jobRun.routeId} jobDefId={jobRun.jobDefId} jobRunNum={jobRun.jobRunNum}
+        camera={jobRun.camera} jobSucceeded={true}
+        companionDepth={{ jobDefId: depthRun.jobDefId, jobRunNum: depthRun.jobRunNum, camera: depthRun.camera }}
+      />}
     </div>
   );
 }

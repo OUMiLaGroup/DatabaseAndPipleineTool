@@ -24,6 +24,7 @@ export function RequeueJobRunButton({ routeId, jobDefId, jobRunNum, camera }: Pr
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["jobRuns", routeId] });
     },
+    meta: { errorTitle: "Could not retry job run" },
   });
 
   const handleClick = () => {

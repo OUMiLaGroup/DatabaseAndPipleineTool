@@ -10,10 +10,6 @@ from services.errors import JobDefinitionNotFoundError
 from services.job_definition_service import JobDefinitionService
 from utilities.service_builder_utilities import build_job_definition_service
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 job_definitions_router = APIRouter(

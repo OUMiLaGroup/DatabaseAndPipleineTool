@@ -1,0 +1,7 @@
+{
+  "name": "Monocular Depth (DA3)",
+  "type": "depth",
+  "implementation_key": "depth_anything_3",
+  "description": "Pixel depth aligned to each original image. Export NPZ maps and data.json. Add camera calibration for meters; otherwise output is focal-normalized, not meters.",
+  "config": {"device": "auto", "process_res": 504, "calibrations": {}, "require_metric": false}
+}

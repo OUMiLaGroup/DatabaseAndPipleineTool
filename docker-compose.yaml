@@ -170,6 +170,7 @@ services:
     volumes:
       - ./cvat_share:/app/cvat_share
       - ./annotations:/app/annotations
+        - mila_model_cache:/root/.cache/huggingface
     networks:
       - default
       - cvat_network
@@ -194,3 +195,6 @@ services:
 networks:
   cvat_network:
     external: true
+
+volumes:
+  mila_model_cache:

@@ -1,0 +1,4 @@
+# Opt-in: docker compose -f docker-compose.yaml -f docker-compose.gpu.yml up -d --build cvat_worker
+services:
+  cvat_worker:
+    gpus: all

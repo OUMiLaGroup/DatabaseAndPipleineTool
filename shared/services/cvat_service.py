@@ -13,7 +13,7 @@ import cvat_sdk.auto_annotation as cvataa
 from cvat_annotation_functions.i_cvat_detection import ICVATDetection
 from db.enums import JobSegmentRunImportStatus, JobStatus
 from models.job_segment_run_dir import JobSegmentRunDir
-from services.errors import CVATActiveError
+from services.errors import CVATActiveError, CVATRestartError, CVATUnavailableError
 from services.job_run_service import JobRunService
 from services.job_segment_run_import_service import JobSegmentRunImportService
 from utilities.cvat_utilities import create_cvat_client, labels_to_patched_requests, extract_ids_to_labels_for_coco_annotation_file
@@ -64,15 +64,19 @@ class CVATService:
         return time.monotonic() - started
 
     def _restart_container(self) -> None:
-        client = docker.from_env()
-        container = client.containers.get(CVAT_CONTAINER_NAME)
-        container.restart(timeout=RESTART_TIMEOUT_SECONDS)
+        try:
+            client = docker.from_env()
+            container = client.containers.get(CVAT_CONTAINER_NAME)
+            container.restart(timeout=RESTART_TIMEOUT_SECONDS)
+        except Exception as e:
+            logger.exception("Failed to restart %s container", CVAT_CONTAINER_NAME)
+            raise CVATRestartError(f"Could not restart the {CVAT_CONTAINER_NAME} container: {e}") from e
 
     def check_cvat_connection(self):
         try:
             self.cvat_client.tasks.list(return_json=False)
         except Exception as e:
-            raise RuntimeError(f"Failed to connect/authenticate to CVAT: {e}") from e
+            raise CVATUnavailableError(f"Failed to connect/authenticate to CVAT: {e}") from e
 
     def wait_for_cvat(self, max_wait_seconds: int = 60, poll_interval: int = 3) -> None:
         deadline = time.time() + max_wait_seconds
@@ -85,7 +89,7 @@ class CVATService:
                 last_error = e
                 time.sleep(poll_interval)
 
-        raise RuntimeError(f"CVAT did not become ready within {max_wait_seconds}s: {last_error}")
+        raise CVATUnavailableError(f"CVAT did not become ready within {max_wait_seconds}s: {last_error}")
 
     def create_new_task_for_img_dir(self, segment_dir: Path, cvat_function: ICVATDetection) -> int:
         """
@@ -106,6 +110,8 @@ class CVATService:
             spec=task_spec, # type: ignore
             resource_type=ResourceType.LOCAL,
             resources=images,
+            # Avoid large image chunks in Redis; prepare small chunks on disk.
+            data_params={'use_cache': False, 'chunk_size': 16},
         )
 
         logger.info(f"Tak created with id {task.id}")

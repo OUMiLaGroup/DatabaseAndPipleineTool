@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; form-action 'none'; frame-src 'none'">
+  <title>MiLa Account / Setup</title>
+  <style>
+    :root {font-family:Segoe UI,Arial,sans-serif;color:#152138;background:#f5f7fb;font-size:15px}
+    * {box-sizing:border-box} body {margin:0;padding:32px} main {max-width:850px;margin:auto}
+    h1 {font-size:32px;margin:0 0 8px} h2 {margin:0 0 16px;font-size:21px}
+    p {line-height:1.55;margin:10px 0 18px;color:#47556d} button,input {font:inherit}
+    button {cursor:pointer} button:disabled {cursor:default;opacity:.5}
+    .switch {display:inline-flex;padding:4px;background:#e4e9f2;border-radius:10px;margin:3px 0 18px}
+    .switch button {border:0;background:transparent;padding:11px 23px;border-radius:7px;color:#152138;font-weight:600}
+    .switch button[aria-pressed=true] {background:#2353be;color:white}
+    .link {border:0;background:transparent;color:#2353be;text-decoration:underline;padding:0;text-align:left}
+    .card {padding:24px;background:white;border:1px solid #e0e5ee;border-radius:12px;margin:20px 0}
+    .formrow {display:grid;grid-template-columns:185px 1fr;gap:16px;align-items:center;margin:12px 0}
+    input {width:100%;padding:10px 12px;border:1px solid #bfcadb;border-radius:6px;background:#fff;color:#152138}
+    input:focus-visible,button:focus-visible {outline:3px solid #97b9ff;outline-offset:2px}
+    .primary {padding:13px 23px;border:0;border-radius:7px;background:#2353be;color:white;font-weight:600}
+    .secondary {padding:9px 16px;border:1px solid #bfcadb;border-radius:6px;background:white;color:#152138}
+    .help {font-size:14px}.helplinks {display:grid;gap:12px;margin:14px 0 0}
+    #status {margin:15px 0 9px} .track {height:12px;background:#e4e9f2;border-radius:8px;overflow:hidden}
+    #bar {height:100%;background:#2353be;width:0;border-radius:8px}
+    #bar.activity {width:28%;animation:activity 1.8s infinite ease-in-out}
+    @keyframes activity {0%{transform:translateX(-100%)}100%{transform:translateX(460%)}}
+    pre {font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f7f9fc;border:1px solid #e0e5ee;border-radius:6px;padding:14px;max-height:220px;overflow:auto;min-height:100px}
+    #error {color:#a12222;background:#fff0ef;padding:12px;border-radius:6px}
+    [hidden] {display:none!important} .workspace {display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}
+    dialog {border:1px solid #d3dbe8;border-radius:12px;padding:25px;width:min(780px,90vw);color:#152138}
+    dialog::backdrop {background:rgba(15,30,55,.35)}
+    .dialoghead {display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+    .check {display:flex;align-items:center;gap:10px} .check input {width:auto}
+    #account-values {max-height:360px;font-size:13px}
+    @media(max-width:700px) {body{padding:20px}.formrow{grid-template-columns:1fr;gap:5px}.card{padding:18px}}
+  </style>
+</head>
+<body><main>
+  <h1 id="title">MiLa setup</h1>
+  <p id="subtitle">Loading saved account settings...</p>
+  <div class="switch" id="switch" role="group" aria-label="Account mode">
+    <button id="existing" aria-pressed="false" type="button">Existing Account</button>
+    <button id="new" aria-pressed="false" type="button">New Account</button>
+  </div><br>
+  <button class="link" id="account-link" disabled>Account - view saved credentials</button>
+  <p id="remembered" hidden>Your account information will be remembered and pre-loaded next time you run this application.</p>
+  <form id="new-account" class="card" hidden autocomplete="off">
+    <h2>Set up your account</h2>
+    <div class="formrow"><label for="username">Shared username</label><input id="username" maxlength="32" autocomplete="off"></div>
+    <div class="formrow"><label for="password">Shared password</label><input id="password" type="password" autocomplete="new-password"></div>
+    <div class="formrow"><label for="confirm">Confirm password</label><input id="confirm" type="password" autocomplete="new-password"></div>
+    <div class="formrow"><label for="token">Comma AI JWT</label><input id="token" type="password" autocomplete="off"></div>
+    <div class="formrow"><label for="license">MinIO license file</label><input id="license" readonly></div>
+    <button class="secondary" id="browse" type="button">Choose license file...</button>
+    <p class="help">Use the same username and password for PostgreSQL, MinIO and CVAT. CVAT email is username@mila.local. Use a password with 12+ characters.</p>
+    <div class="helplinks"><button class="link" id="comma-help" type="button">Get Comma JWT: sign in at jwt.comma.ai with your driving-data account.</button>
+      <button class="link" id="minio-help" type="button">Get the separate MinIO AIStor license from your administrator or MinIO.</button></div>
+  </form>
+  <section class="card">
+    <p id="estimate">Estimated first setup: 30-90+ minutes; an existing setup usually takes 1-5 minutes. Downloads and builds depend on network and CPU. Windows/Docker may request approval, terms acceptance or a restart.</p>
+    <div id="error" role="alert" hidden></div>
+    <button class="primary" id="install" disabled>Install necessary components</button>
+    <div id="status" role="status">Loading...</div>
+    <div class="track" role="progressbar" aria-label="Installation progress"><div id="bar"></div></div>
+    <pre id="log" aria-label="Installation output"></pre>
+    <div class="workspace"><button class="secondary" id="open-mila">Open MiLa tab</button><button class="secondary" id="open-cvat">Open CVAT tab</button></div>
+    <p class="help" id="ready">Dashboard tabs load automatically when their services are ready.</p>
+  </section>
+  <dialog id="account-dialog"><div class="dialoghead"><h2>Account</h2><button class="secondary" id="close-account">Close</button></div>
+    <p>Your account information will be remembered and pre-loaded next time you run this application.</p>
+    <label class="check"><input id="reveal" type="checkbox">Show passwords and Comma token</label><pre id="account-values"></pre>
+  </dialog>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  let mode = 'new', state = null, cursor = 0, api = null, polling = false;
+  function error(message) { $('error').textContent = message; $('error').hidden = !message; }
+  function setMode(value) {
+    mode = value;
+    $('existing').setAttribute('aria-pressed', value === 'existing');
+    $('new').setAttribute('aria-pressed', value === 'new');
+    $('new-account').hidden = value !== 'new';
+    $('remembered').hidden = value !== 'existing';
+    $('subtitle').textContent = value === 'existing' && state?.configured
+      ? 'Existing configuration found. Open Account link below to view it, or start your workspace.'
+      : value === 'existing' ? 'Choose New Account to enter your account information.'
+      : 'Set up your account, install the components, then open your workspace.';
+    $('install').textContent = value === 'existing' ? 'Check components and start MiLa' : 'Install necessary components';
+    $('install').disabled = !state || state.running || (value === 'existing' && !state.configured);
+    error('');
+  }
+  $('existing').onclick = () => setMode('existing');
+  $('new').onclick = () => setMode('new');
+  $('new-account').onsubmit = event => event.preventDefault();
+  $('browse').onclick = async () => { const path = await api.choose_license(); if(path) $('license').value = path; };
+  $('comma-help').onclick = () => api.open_help('comma');
+  $('minio-help').onclick = () => api.open_help('minio');
+  $('open-mila').onclick = () => api.select_tab('mila');
+  $('open-cvat').onclick = () => api.select_tab('cvat');
+  $('install').onclick = async () => {
+    error(''); $('install').disabled = true;
+    try {
+      const details = Object.fromEntries(['username','password','confirm','token','license'].map(key => [key, $(key).value]));
+      const response = await api.start_install(mode, details);
+      if(response.error) { error(response.error); setEnabled(); }
+      else { $('log').textContent = ''; await refresh(); }
+    } catch(e) { error('Unable to start setup. Please retry.'); setEnabled(); }
+  };
+  function setEnabled() {
+    $('install').disabled = !state || state.running || (mode === 'existing' && !state.configured);
+    $('existing').disabled = $('new').disabled = !!state?.running;
+  }
+  async function showAccount() {
+    const values = await api.account($('reveal').checked);
+    $('account-values').textContent = Object.entries(values).map(([key,value]) => `${key}=${value}`).join('\n');
+  }
+  $('account-link').onclick = async () => { $('reveal').checked=false; await showAccount(); $('account-dialog').showModal(); };
+  $('reveal').onchange = showAccount;
+  $('close-account').onclick = () => $('account-dialog').close();
+  $('account-dialog').addEventListener('close', () => { $('account-values').textContent = ''; $('reveal').checked = false; });
+  async function refresh() {
+    if(polling) return;
+    polling = true;
+    try {
+      const previous = state;
+      state = await api.state(cursor);
+      cursor = state.cursor;
+      if(!previous) { $('license').value=state.license; setMode(state.configured ? 'existing' : 'new'); }
+      if(previous && !previous.configured && state.configured) {
+        setMode('existing'); ['password','confirm','token'].forEach(key => $(key).value='');
+      }
+      $('account-link').disabled = !state.configured;
+      $('status').textContent = state.status;
+      if(state.logs.length) {
+        const log = $('log'); log.textContent = (log.textContent + state.logs.join('\n') + '\n').slice(-70000); log.scrollTop=log.scrollHeight;
+      }
+      $('bar').classList.toggle('activity', state.running && state.progress === null);
+      $('bar').style.width = state.progress === null ? (state.running ? '28%' : '0') : `${state.progress}%`;
+      $('ready').textContent = `MiLa: ${state.ready.mila ? 'ready' : 'waiting for services'} | CVAT: ${state.ready.cvat ? 'ready' : 'waiting for services'}`;
+      if(state.complete) {
+        $('title').textContent='Your MiLa workspace';
+        $('subtitle').textContent='Startup checks passed. Open MiLa or CVAT using the tabs above.';
+        $('switch').hidden=true; $('new-account').hidden=true; $('estimate').hidden=true; $('remembered').hidden=false;
+        $('install').textContent='Check and start again';
+      }
+      if(state.code && !state.running) $('install').textContent='Retry setup';
+      setEnabled();
+    } catch(e) { error('Unable to read setup status. Reopen the application if this continues.'); }
+    finally { polling=false; }
+  }
+  window.addEventListener('pywebviewready', async () => { api=window.pywebview.api; await refresh(); setInterval(refresh,500); });
+</script>
+</body></html>

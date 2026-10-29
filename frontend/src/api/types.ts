@@ -33,6 +33,7 @@ export interface RouteResponse {
   file_path: string | null;
   status: RouteStatus;
   created_at: string;
+  download_error?: { code: string; message: string } | null;
 }
 
 export interface SegmentResponse {
@@ -43,6 +44,7 @@ export interface SegmentResponse {
   end_time: string;
   created_at: string;
   frame_count?: number;
+  error?: string | null;
 }
 
 export interface JobRunResponse {
@@ -66,6 +68,7 @@ export interface Route {
   filePath: string | null;
   createdAt: string;
   status: RouteStatus;
+  downloadError?: string | null;
 }
 
 export interface Segment {
@@ -77,6 +80,8 @@ export interface Segment {
   frameCount: number;
   status: SegmentStatus;
   annotationCount: number;
+  /** Why the segment failed to download/upload. */
+  error: string | null;
 }
 
 export interface JobRun {
@@ -101,6 +106,7 @@ export interface JobSegmentRunResponse {
   camera: string;
   segment_id: number;
   status: JobSegmentRunStatus;
+  error?: string | null;
 }
 
 export interface JobSegmentRun {
@@ -110,6 +116,8 @@ export interface JobSegmentRun {
   camera: string;
   segmentId: number;
   status: JobSegmentRunStatus;
+  /** Why this segment failed during the job run. */
+  error: string | null;
 }
 
 // ─── CVAT Import Types ───────────────────────────────────────────────────────
@@ -173,7 +181,7 @@ export function mapCvatImport(r: CvatImportResponse): CvatImport {
 
 // ─── Job Definition Types ────────────────────────────────────────────────────
 
-export type JobType = "object_detection" | "lane_detection" | "segmentation";
+export type JobType = "object_detection" | "lane_detection" | "segmentation" | "depth";
 
 export interface JobDefinitionResponse {
   job_def_id: number;
@@ -211,6 +219,7 @@ export function mapRoute(r: RouteResponse): Route {
     filePath: r.file_path,
     createdAt: r.created_at,
     status: r.status,
+    downloadError: r.download_error?.message ?? null,
   };
 }
 
@@ -236,6 +245,7 @@ export function mapSegment(s: SegmentResponse): Segment {
     status: s.status,
 
     annotationCount: 0,
+    error: s.error ?? null,
   };
 }
 
@@ -274,5 +284,6 @@ export function mapJobSegmentRun(j: JobSegmentRunResponse): JobSegmentRun {
     camera: j.camera,
     segmentId: j.segment_id,
     status: j.status,
+    error: j.error ?? null,
   };
 }

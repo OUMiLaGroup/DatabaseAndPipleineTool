@@ -58,16 +58,17 @@ conda create -n "$conda_env_name" python=3.12 -y
 source "$(conda info --base)/etc/profile.d/conda.sh"
 conda activate "$conda_env_name"
 pip install uv
-# tools/op.sh setup # this errors due to a hash mismatch
-uv lock --refresh
-tools/op.sh setup # now it works
+# Preserve v0.9.8's lockfile. The optional tools extra installs a simulator
+# wheel with a mismatched upstream hash; this replay worker does not use it.
+python /app/scripts/configure_replay_dependencies.py tools/install_python_dependencies.sh
+tools/op.sh setup
 source .venv/bin/activate
 scons -u -j$(nproc)
 
 # Add extra req
-uv add pandas
-uv add opencv-python
-uv add pyarrow
+# Add extraction dependencies without re-resolving the entire OpenPilot project
+# or removing the dev extras installed above. Preserve OpenPilot's NumPy limit.
+uv pip install --python .venv/bin/python pandas opencv-python pyarrow 'numpy<2.0.0'
 # Copy over files
 cd /app
 # ./scripts/copy_over_post_compile_files.sh

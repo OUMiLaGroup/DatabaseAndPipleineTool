@@ -8,6 +8,8 @@ import { JobRunRow } from "./JobRunRow";
 import { SegmentTimeline } from "./SegmentTimeline";
 import { CreateJobRunButton } from "./CreateJobRunButton";
 import { deleteRoute } from "../../api/routes";
+import { FailureReason } from "../FailureReason";
+import { Link } from "react-router-dom";
 
 const ROUTE_STATUS_COLORS: Record<string, string> = {
   "download queue": "var(--text-secondary)",
@@ -74,6 +76,12 @@ export function RouteDetailHeader({
       >
         ← Routes
       </button>
+      {(route.downloadError || route.status === "failed") && (
+        <p role="alert" style={{ color: "var(--accent-alert)", fontSize: "var(--text-sm)", lineHeight: 1.5 }}>
+          {route.downloadError || "This route failed before detailed errors were recorded. Check the worker logs or retry it."}
+          {" To retry, delete the failed route and import it again after fixing the cause."}
+        </p>
+      )}
 
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--space-4)", flexWrap: "wrap", marginBottom: "var(--space-2)" }}>
         <h1 style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-lg)", fontWeight: 700, color: "var(--text-on-inverse)", letterSpacing: "-0.01em", margin: 0 }}>
@@ -114,7 +122,17 @@ export function RouteDetailHeader({
         <span>{formatDate(route.createdAt)}</span>
         <span style={{ color: "var(--border-on-inverse-subtle)" }}>·</span>
         <span>{segments.length} segments</span>
+        <span style={{ color: "var(--border-on-inverse-subtle)" }}>·</span>
+        <Link to={`/activity?route=${encodeURIComponent(route.id)}`} style={{ color: "var(--text-on-inverse-secondary)" }}>
+          View activity →
+        </Link>
       </div>
+
+      {route.error && (
+        <div style={{ marginBottom: "var(--space-4)" }}>
+          <FailureReason text={route.error} tone={route.status === "failed" ? "alert" : "warning"} dark variant="block" />
+        </div>
+      )}
 
       <div style={{ display: "flex", flexWrap: "wrap", border: "1px solid var(--border-on-inverse-faint)", marginBottom: "var(--space-4)" }}>
         <DarkStatCell label="Segments"  value={segments.length} />

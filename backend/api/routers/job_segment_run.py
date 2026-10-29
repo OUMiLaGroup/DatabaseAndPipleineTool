@@ -1,14 +1,15 @@
 import logging
 
-from fastapi import APIRouter, Depends, Response, status
+from fastapi import APIRouter, Depends, Response, status, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import get_session, get_transactional_session
-from db.enums import CameraType, JobSegmentRunImportStatus
+from db.enums import CameraType, JobSegmentRunImportStatus, JobType
 from db.models.job_segment_run import JobSegmentRun
 from db.models.job_segment_run_import import JobSegmentRunImport
 from schemas.segment import JobSegmentRunResponse, SegmentJobImportResponse
 from utilities.service_builder_utilities import build_job_segment_run_import_service, build_job_segment_run_service
+from utilities.service_builder_utilities import build_job_definition_service
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +83,9 @@ async def import_job_segment_run_to_cvat(
     session: AsyncSession = Depends(get_transactional_session)
 ) -> JobSegmentRunImport:
     logging.info("Importing job segment run to cvat")
+    definition = await build_job_definition_service(session=session).get_job_definition(job_def_id)
+    if definition is not None and definition.type == JobType.DEPTH:
+        raise HTTPException(400, "Pixel depth maps are exported as NPZ labels, not CVAT COCO boxes. Use Export on the route's depth job.")
     job_segment_run_review_service = build_job_segment_run_import_service(session=session)
     job_segment_run_review = await job_segment_run_review_service.create(
         job_run_num=job_run_num,

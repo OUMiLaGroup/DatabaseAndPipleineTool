@@ -42,9 +42,10 @@ interface Props {
   jobRunNum: number;
   camera: string;
   jobSucceeded: boolean;
+  companionDepth?: { jobDefId: number; jobRunNum: number; camera: string };
 }
 
-export function ExportJobRunButton({ routeId, jobDefId, jobRunNum, camera, jobSucceeded }: Props) {
+export function ExportJobRunButton({ routeId, jobDefId, jobRunNum, camera, jobSucceeded, companionDepth }: Props) {
   if (!camera) return null;
   const queryClient = useQueryClient();
   const queryKey = ["dataset-exports", routeId];
@@ -62,11 +63,11 @@ export function ExportJobRunButton({ routeId, jobDefId, jobRunNum, camera, jobSu
   const existing = useMemo(
     () =>
       allExports.find((e) =>
-        e.jobRuns.some(
+        e.jobRuns.length === (companionDepth ? 2 : 1) && e.jobRuns.some(
           (jr) => jr.jobDefId === jobDefId && jr.jobRunNum === jobRunNum && jr.camera === camera,
-        ),
+        ) && (!companionDepth || e.jobRuns.some((jr) => jr.jobDefId === companionDepth.jobDefId && jr.jobRunNum === companionDepth.jobRunNum && jr.camera === companionDepth.camera)),
       ) ?? null,
-    [allExports, jobDefId, jobRunNum, camera],
+    [allExports, jobDefId, jobRunNum, camera, companionDepth],
   );
 
   const createMutation = useMutation({
@@ -74,12 +75,13 @@ export function ExportJobRunButton({ routeId, jobDefId, jobRunNum, camera, jobSu
       createDatasetExport({
         routeId,
         cameraViews: [camera],
-        jobRuns: [{ jobDefId, jobRunNum, camera }],
+        jobRuns: [{ jobDefId, jobRunNum, camera }, ...(companionDepth ? [companionDepth] : [])],
       }),
     onSuccess: (newExport) => {
       queryClient.setQueryData<DatasetExport[]>(queryKey, (old = []) => [...old, newExport]);
       queryClient.invalidateQueries({ queryKey });
     },
+    meta: { errorTitle: "Could not start dataset export" },
   });
 
   const retryMutation = useMutation({
@@ -88,7 +90,7 @@ export function ExportJobRunButton({ routeId, jobDefId, jobRunNum, camera, jobSu
       return createDatasetExport({
         routeId,
         cameraViews: [camera],
-        jobRuns: [{ jobDefId, jobRunNum, camera }],
+        jobRuns: [{ jobDefId, jobRunNum, camera }, ...(companionDepth ? [companionDepth] : [])],
       });
     },
     onSuccess: (newExport) => {
@@ -98,6 +100,7 @@ export function ExportJobRunButton({ routeId, jobDefId, jobRunNum, camera, jobSu
       ]);
       queryClient.invalidateQueries({ queryKey });
     },
+    meta: { errorTitle: "Could not retry dataset export" },
   });
 
   const isPending = createMutation.isPending || retryMutation.isPending;
@@ -126,7 +129,7 @@ export function ExportJobRunButton({ routeId, jobDefId, jobRunNum, camera, jobSu
         style={style}
         title="Download export zip"
       >
-        {label}
+        {companionDepth ? "Download + depth ↓" : label}
       </a>
     );
   }
@@ -157,7 +160,7 @@ export function ExportJobRunButton({ routeId, jobDefId, jobRunNum, camera, jobSu
           }}
         />
       )}
-      {label}
+      {companionDepth && state === "export" ? "Export + depth" : label}
     </button>
   );
 }

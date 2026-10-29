@@ -10,3 +10,4 @@ from db.models.route import Route as Route
 from db.models.segment import Segment as Segment
 from db.models.segment_artifact import SegmentArtifact as SegmentArtifact
 from db.models.job_segment_run_import import JobSegmentRunImport as JobSegmentRunImport
+from db.models.audit_log import AuditLog as AuditLog

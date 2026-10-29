@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID
 
-from db.enums import CameraType, DatasetExportStatus, JobStatus, RouteStatus
+from db.enums import CameraType, DatasetExportStatus, JobStatus, RouteStatus, JobSegmentRunStatus
 from db.models.artifact import Artifact
 from db.models.dataset_export import DatasetExport
 from db.models.dataset_export_job_run import DatasetExportJobRun
@@ -127,6 +127,10 @@ class DatasetExportService:
                     "All referenced job runs must be SUCCEEDED before export creation"
                 )
             validated_job_runs.append((job_def_id, job_run_num, camera))
+            segments = await self._job_run_repository.get_segments_for_export(job_run_num, job_def_id, route_id, camera)
+            incomplete = [s.segment_id for s in segments if s.status != JobSegmentRunStatus.SUCCEEDED or s.artifact_id is None]
+            if not segments or incomplete:
+                raise DatasetExportValidationError(f"Cannot export job {job_def_id}, run {job_run_num}: annotation outputs are missing or incomplete for segments {incomplete}. Repair the annotation job first.")
 
         dataset_export = await self._dataset_export_repository.create(
             route_id=route_id,

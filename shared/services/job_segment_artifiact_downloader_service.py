@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from db.enums import JobSegmentRunStatus
+from db.enums import JobSegmentRunStatus, ArtifactKind
 from db.models.job_segment_run import JobSegmentRun
 from models.job_segment_run_dir import JobSegmentRunDir
 from services.artifact_service import ArtifactService
@@ -46,6 +46,8 @@ class JobSegmentArtifactDownloaderService:
 
         if not artifact:
             raise ValueError(f"No artifact found with artifact_id {job_segment_run.artifact_id}")
+        if artifact.kind == ArtifactKind.ZIP:
+            raise ValueError("Pixel depth maps cannot be imported as CVAT COCO boxes. Use Export to download the depth labels and matching images.")
 
         self._minio_service.download_artifact(
             artifact=artifact,

@@ -1,0 +1,9 @@
+# Core monocular inference only; omit upstream reconstruction/UI dependencies.
+numpy<2
+einops>=0.8,<1
+omegaconf==2.3.0
+addict==2.4.0
+imageio>=2.34,<3
+opencv-python-headless>=4.10,<4.12
+huggingface-hub>=0.26
+safetensors>=0.4

@@ -41,10 +41,14 @@ class MinioService:
         )
 
     def put_job_segment_run_data(self, job_segment_run: JobSegmentRun, file_path: Path) -> ObjectWriteResult:
+        is_zip = file_path.suffix.lower() == ".zip"
+        object_name = get_job_segment_run_object_name(job_segment_run)
+        if is_zip:
+            object_name = object_name.removesuffix("data.json") + f"{job_segment_run.camera.value}/depth-labels.zip"
         return self.minio_client.fput_object(
             bucket_name=self.bucket_name,
-            object_name=get_job_segment_run_object_name(job_segment_run),
-            content_type="application/json",
+            object_name=object_name,
+            content_type="application/zip" if is_zip else "application/json",
             file_path=str(file_path)
         )
 

@@ -1,0 +1,7 @@
+{
+  "name": "General Detection",
+  "type": "object_detection",
+  "implementation_key": "detr_detection",
+  "description": "General object detection using the existing RT-DETR implementation. Detects common objects such as people, vehicles, bicycles and traffic lights for review in CVAT.",
+  "config": {"model_name": "PekingU/rtdetr_v2_r50vd"}
+}

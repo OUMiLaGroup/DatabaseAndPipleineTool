@@ -102,6 +102,35 @@ class JobSegmentRunImportService:
     async def set_error(self, job_segment_run_import: JobSegmentRunImport, error_message: str) -> JobSegmentRunImport:
         return await self._job_segment_run_import_repository.set_error(job_segment_run_import=job_segment_run_import, error_message=error_message)
 
+    async def mark_failed(
+        self,
+        job_run_num: int,
+        job_def_id: int,
+        route_id: str,
+        segment_id: int,
+        camera: CameraType,
+        error_message: str,
+    ) -> JobSegmentRunImport:
+        """Like ``set_error`` but looks the import up by its IDs (safe to call after a rollback)."""
+        job_segment_run_import = await self._job_segment_run_import_repository.get_by_id(
+            job_run_num=job_run_num,
+            job_def_id=job_def_id,
+            route_id=route_id,
+            segment_id=segment_id,
+            camera=camera,
+        )
+        if not job_segment_run_import:
+            raise JobSegmentRunNotFoundError(
+                job_run_num=job_run_num,
+                job_def_id=job_def_id,
+                route_id=route_id,
+                segment_id=segment_id
+            )
+        return await self._job_segment_run_import_repository.set_error(
+            job_segment_run_import=job_segment_run_import,
+            error_message=error_message,
+        )
+
     async def get_next_by_status(
         self,
         status: JobSegmentRunImportStatus

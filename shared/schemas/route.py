@@ -17,3 +17,4 @@ class RouteResponse(BaseModel):
     file_path: str | None
     status: RouteStatus
     created_at: datetime
+    download_error: dict[str, str] | None = None

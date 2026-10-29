@@ -1,5 +1,101 @@
 # Openpilot Data Pipeline
 
+Pixel-level monocular depth labels are available through the **Monocular Depth
+(DA3)** job definition. See [setup, calibration and export instructions](scripts/Depth-Anything-3.md).
+Use **Export + depth** on a completed detection job to include matching depth maps.
+
+## Authors for Capstone 2026
+- Kalyani Valath
+- Chi Nguyen
+- Daniel Yeaman
+- Michael Cote
+- Farzana Tasnim
+
+## Background
+
+This repository contains code for the data pipeline for the
+[Comma AI](https://comma.ai/) Platform. It is organized as a
+containerized mono-repo.
+
+An end-to-end platform to ingest, process, and manage driving data
+for computer vision workflows for OpenPilot.
+
+A unified system with job execution, artifact storage, and Computer
+Vision Annotation Tool (CVAT) labeling for future machine learning
+and human review.
+
+## Fall 2026 Capstone Continuation
+
+This project is a continuation of a previous University of Oklahoma
+Computer Science capstone project for the MiLa autonomous vehicle
+research platform.
+
+The previous capstone team developed the core infrastructure for
+ingesting, processing, annotating, and storing autonomous-driving data.
+
+Our team is continuing development of the existing platform with the
+goal of reducing the amount of manual work required to prepare
+autonomous-driving data for machine learning training and research.
+
+The overall data preparation pipeline includes:
+
+- Multimodal driving-data collection
+- Camera and video processing
+- GPS and IMU data handling
+- LiDAR data integration
+- Data annotation
+- Data and artifact storage
+- Preparation of datasets for machine-learning experiments
+
+## Project Objectives
+
+The primary goal of the project is to automate more of the AI training
+data preparation pipeline used for the MiLa autonomous research vehicle.
+
+Our team will focus on understanding and extending the existing system,
+identifying manual or inefficient steps, and improving the reliability
+and automation of the data pipeline.
+
+## Technologies and Tools
+
+| Technology | Purpose |
+| --- | --- |
+| Python | Data processing, backend services, workers, and CVAT integration |
+| Docker | Containerization of the services in the data pipeline |
+| CVAT | Computer vision data annotation |
+| FastAPI | Backend API and pipeline orchestration |
+| React + Vite | Frontend interface |
+| PostgreSQL | Structured data and job metadata storage |
+| MinIO | Storage for large driving-data artifacts |
+| OpenPilot / Comma AI | Driving-data source and autonomous-driving platform |
+
+## Ticket 2 Key Feature
+
+One key feature of the current platform is the automated retrieval and
+processing of driving data.
+
+The OpenPilot Download Worker monitors the Routes table for routes that
+are ready to be downloaded. When an eligible route is detected, the
+worker retrieves the corresponding driving data and stores it for later
+processing and annotation.
+
+For Ticket 2, our group will document and test a specific behavior
+associated with this feature.
+
+## Fall 2026 Goals and Progress Plan
+
+Our current goals are to:
+
+1. Understand the architecture and functionality implemented by the
+   previous capstone team.
+2. Identify manual or inefficient steps in the existing data preparation
+   workflow.
+3. Improve automation of the collection, processing, annotation, or
+   storage pipeline.
+4. Improve reliability through testing and validation.
+5. Extend the platform to better support data collected from the MiLa
+   autonomous research vehicle.
+
 ## Authors
 
 - Noah Pursell
@@ -7,14 +103,6 @@
 - Vinh Khang Huynh
 - Thomas Petersen
 - Roman Beames
-
-## Background
-
-This repository contains code for the data pipeline for the [Comma AI](https://comma.ai/) Platform. It is organized as a containerized mono-repo.  
-
-An end-to-end platform to ingest, process, and manage driving data for compute vision workflows for Open Pilot.​
-
-A unified system with job execution, artifact storage, and Computer Vision Annotation Tool (CVAT) labeling for future machine learning and human review.
 
 ## Videos
 
@@ -47,6 +135,29 @@ A unified system with job execution, artifact storage, and Computer Vision Annot
 1. Move the license into the folder. It should be called `minio/minio.license`
 
 ## Running the Code
+
+### Windows startup launcher (recommended for daily use)
+
+New users can download **MiLa-Installer.exe** alone; it includes the project and
+automatically downloads Python when missing. It installs into
+`%LOCALAPPDATA%\MiLa\Project` and opens the account screen.
+For development, double-click **Start-MiLa-GUI.cmd** or **MiLa-Launcher.exe** in this folder.
+The editable Python workspace uses Python 3.10+ with Tcl/Tk. The bootstrap
+installs pywebview and Microsoft WebView2 Runtime if missing. Saved credentials
+select **Existing Account** automatically; **New Account** displays the setup form.
+The setup screen collects one
+shared account for new PostgreSQL, MinIO and CVAT installations, a Comma JWT, and
+your MinIO license file. It saves `.env`, installs missing Windows prerequisites,
+shows download/build progress, and displays MiLa and CVAT inside native tabs.
+Saved credentials are available under **Account**.
+Keep the executable with the complete project folder. See
+[GUI launcher details](launcher/README.md) for setup, editing and limitations.
+**Start-MiLa.cmd** remains available as the console alternative.
+
+See [Startup instructions and troubleshooting](scripts/STARTUP.md) for first-time
+setup, read-only checks, rebuild options, and limitations.
+
+### Manual startup
 
 1. Start the databases with 
 ```bash 
@@ -138,6 +249,30 @@ Before commiting any code, run the `ruff` linter and fix any issues found.
 Before commiting any code, run the `pyright` static type checker and fix any issues found.
 
 `pyright`
+
+### Error Handling
+
+**Seeing an error?** See the [Error Guide](./docs/ERROR_GUIDE.md): what each error code means and how to fix it, plus common setup problems. The **Activity** page in the app shows an audit log of every action and pipeline outcome.
+
+Expected errors are defined in `shared/services/errors.py`. Every error subclasses `PipelineError` and carries a stable `code`, an HTTP `status_code`, and a user-facing `hint` that explains how to fix the problem. The backend has one handler for all of them, so every error response has the same shape:
+
+```json
+{
+  "detail": "Route db478799b6f9f210|0000000e--9ecd39f6bc is not ready for job creation; current status is downloading",
+  "code": "ROUTE_NOT_READY",
+  "hint": "Job runs can only be created once the route status is UPLOADED. ...",
+  "context": { "route_id": "db478799b6f9f210|0000000e--9ecd39f6bc", "status": "downloading" },
+  "request_id": "4f1c2a9b7d10"
+}
+```
+
+- To add a new error, subclass `PipelineError` (or `NotFoundError` / `ConflictError` / `AlreadyExistsError`), set `code`, `status_code` and `hint`, and raise it. You don't need a new handler in `backend/main.py`.
+- Unexpected exceptions return `500` with `code: "INTERNAL_ERROR"` and a `request_id`. Every backend log line includes `[req=<id>]`, so you can find the traceback with `docker compose logs backend | grep <request_id>`.
+- **Failure reasons are stored in the database.** `routes.error`, `segments.error`, `job_runs.error`, `job_segment_run.error`, `dataset_exports.error` and `job_segment_run_review.error_message` say why something failed, formatted as `<what went wrong> | How to fix: <hint>`, and the UI shows them. A route or job run that partly succeeded keeps its success status and stores a warning such as `2 of 10 segments failed (segments: 3, 7) ...`. Use `describe_exception()` and `record_failure()` from `shared/utilities/error_utilities.py` when writing a new worker.
+- **Logging:** call `logger = configure_logging("<service_name>")` from `shared/utilities/logging_utilities.py` once at the top of a worker. Inside `except` blocks use `logger.exception("what failed")` so the traceback is kept. Don't write `logging.error(f"...", e)`: that drops the error. Set `LOG_LEVEL=DEBUG` for more detail.
+- **Audit log:** every change made through the API (including failed attempts) and every worker outcome is recorded in the `audit_logs` table, shown on the **Activity** page and available at `GET /audit-logs/`. The API records actions automatically (`backend/api/audit.py`); in a worker, call `configure_audit(SessionLocal, source="<worker>")` once and `record_audit(...)` for outcomes (`shared/services/audit_service.py`).
+- **Migrations:** the `error` columns (`c4e1a9b27d53`) and the `audit_logs` table (`d7f3b2e8a1c4`). To apply them to an existing database, run `docker compose up --build alembic_worker`.
+- In the frontend, `apiFetch` throws an `ApiError` with `code`, `hint` and `requestId`. Failed mutations show a toast automatically (set `meta: { errorTitle: "Could not ..." }` for a clear title, or `meta: { inlineError: true }` if the component shows the error itself with `<ErrorNotice />`).
 
 ## Testing
 

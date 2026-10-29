@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import ForeignKeyConstraint, ForeignKey
+from sqlalchemy import ForeignKeyConstraint, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base
@@ -50,6 +50,12 @@ class JobSegmentRun(Base):
     artifact_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("artifacts.artifact_id"), 
         nullable=True
+    )
+
+    # Why this segment of the job run failed (or a warning, e.g. some segments failed). Shown in the UI.
+    error: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
     )
 
     def __repr__(self):

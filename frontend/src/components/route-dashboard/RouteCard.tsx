@@ -5,6 +5,7 @@ import { RouteThumbnail } from "./RouteThumbnail";
 import { StatusBadge } from "./StatusBadge";
 import { UploadBar } from "./UploadBar";
 import { deleteRoute } from "../../api/routes";
+import { FailureReason } from "../FailureReason";
 
 export function RouteCard({
   route,
@@ -106,10 +107,20 @@ export function RouteCard({
           <div style={{ marginTop: "4px", fontSize: "10px", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
             {formatDate(route.createdAt)}
           </div>
+          {route.error && (
+            <div style={{ marginTop: "4px" }}>
+              <FailureReason text={route.error} tone={route.status === "failed" ? "alert" : "warning"} variant="compact" maxWidth="100%" />
+            </div>
+          )}
         </div>
 
         <div style={{ height: "1px", backgroundColor: "var(--border-subtle)" }} />
         <UploadBar segments={segments} jobRuns={jobRuns} />
+        {(route.downloadError || route.status === "failed") && (
+          <p role="alert" style={{ color: "var(--accent-alert)", fontSize: "var(--text-xs)", margin: 0, lineHeight: 1.5 }}>
+            {route.downloadError || "This route failed before detailed errors were recorded. Check the worker logs or retry it. To retry, delete the failed route and import it again."}
+          </p>
+        )}
       </div>
     </div>
   );

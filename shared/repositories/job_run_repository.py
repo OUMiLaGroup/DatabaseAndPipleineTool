@@ -5,11 +5,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from db.enums import CameraType
 from db.models.job_run import JobRun, JobStatus
+from db.models.job_segment_run import JobSegmentRun
 
 
 class JobRunRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+
+    async def get_segments_for_export(self, job_run_num: int, job_def_id: int, route_id: str, camera: CameraType) -> list[JobSegmentRun]:
+        return list((await self._session.scalars(select(JobSegmentRun).where(
+            JobSegmentRun.job_run_num == job_run_num, JobSegmentRun.job_def_id == job_def_id,
+            JobSegmentRun.route_id == route_id, JobSegmentRun.camera == camera,
+        ))).all())
 
     async def get_by_id(self, job_run_num:int, job_def_id:int, route_id:str, camera: CameraType) -> JobRun | None:
         return await self._session.get(JobRun, {

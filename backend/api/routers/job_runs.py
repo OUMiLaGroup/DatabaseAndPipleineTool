@@ -1,20 +1,18 @@
 import logging
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Depends, Response, status, APIRouter
+from fastapi import Depends, Response, status, APIRouter, HTTPException
 
 from api.dependencies import get_session, get_transactional_session
-from db.enums import CameraType
+from db.enums import CameraType, JobType
+from depth_config import DepthConfig
 from db.models.job_run import JobRun
 from schemas.job_run import CreateJobRunRequest, JobRunResponse
 from services.errors import JobRunNotFoundError
 from services.job_run_service import JobRunService
 from utilities.service_builder_utilities import build_delete_service, build_job_run_service
+from utilities.service_builder_utilities import build_job_definition_service
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 job_runs_router = APIRouter(
@@ -71,6 +69,12 @@ async def create_job_run(
     session: AsyncSession = Depends(get_transactional_session),
 ) -> JobRun:
     logging.info("create job run")
+    definition = await build_job_definition_service(session=session).get_job_definition(payload.job_def_id)
+    if definition is not None and definition.type == JobType.DEPTH:
+        try:
+            DepthConfig.model_validate(definition.config).calibration_for(payload.camera.value)
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
     job_run_service: JobRunService = build_job_run_service(session=session)
     return await job_run_service.create_job_run(
         job_def_id=payload.job_def_id,

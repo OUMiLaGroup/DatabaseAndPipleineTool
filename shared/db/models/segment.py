@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, Integer, DateTime, func, ForeignKey, JSON 
+from sqlalchemy import CheckConstraint, Integer, DateTime, String, func, ForeignKey, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base
@@ -45,6 +45,11 @@ class Segment(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+    # Why this segment failed (or a warning, e.g. some segments failed). Shown in the UI.
+    error: Mapped[str | None] = mapped_column(
+        String,
+        nullable=True,
     )
 
     def __repr__(self):

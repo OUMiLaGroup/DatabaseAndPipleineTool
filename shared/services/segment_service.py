@@ -57,12 +57,16 @@ class SegmentService:
         route_id: str,
         segment_id: int,
         status: SegmentStatus,
+        error: str | None = None,
     ) -> Segment:
+        """Set the segment status. Pass ``error`` to record why it failed (only written when given)."""
         segment = await self._segment_repository.get_by_id(route_id, segment_id)
         if segment is None:
             raise SegmentNotFoundError(route_id, segment_id)
 
         segment.status = status
+        if error is not None:
+            segment.error = error
         return await self._segment_repository.save(segment)
 
     # Update the segment_meta of a segment

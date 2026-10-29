@@ -1,11 +1,12 @@
 import { NavLink } from "react-router-dom";
-import { Route, BriefcaseBusiness } from "lucide-react";
+import { Route, BriefcaseBusiness, History } from "lucide-react";
 import RefreshCvatButton from "./RefreshCvatButton";
 import milaLogo from "../assets/mila_logo.png";
 
 const navItems = [
   { to: "/routes", label: "Routes", icon: Route },
   { to: "/job-definitions", label: "Jobs", icon: BriefcaseBusiness },
+  { to: "/activity", label: "Activity", icon: History },
 ];
 
 export default function TopBar() {

@@ -5,6 +5,7 @@ import { createJobRun } from "../../api/job_runs";
 import { CAMERAS } from "../../api/types";
 import type { JobRun } from "../../api/types";
 import { formatCamera } from "../../utils/formatters";
+import { ErrorNotice } from "../ErrorNotice";
 
 const selectStyle: React.CSSProperties = {
   flex: 1,
@@ -31,7 +32,7 @@ export function CreateJobRunButton({ routeId }: { routeId: string }) {
   const [hovered, setHovered] = useState(false);
   const [jobDefId, setJobDefId] = useState<number | "">("");
   const [camera, setCamera] = useState<string>(CAMERAS[0]);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   const { data: jobDefsRaw = [], isLoading: defsLoading } = useQuery({
@@ -75,8 +76,10 @@ export function CreateJobRunButton({ routeId }: { routeId: string }) {
     },
     onError: (err: unknown, _vars, ctx) => {
       if (ctx) queryClient.setQueryData(["jobRuns", routeId], ctx.previous);
-      setError(err instanceof Error ? err.message : "Failed to create job run");
+      setError(err);
     },
+    // Shown inline in the form below, so no global toast
+    meta: { inlineError: true },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["jobRuns", routeId] });
     },
@@ -260,11 +263,7 @@ export function CreateJobRunButton({ routeId }: { routeId: string }) {
         </div>
       </div>
 
-      {error && (
-        <div style={{ fontSize: "10px", fontFamily: "var(--font-mono)", color: "var(--accent-alert)" }}>
-          {error}
-        </div>
-      )}
+      {error != null && <ErrorNotice error={error} title="Could not create job run" />}
     </form>
   );
 }

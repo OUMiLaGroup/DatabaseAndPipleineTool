@@ -1,0 +1,44 @@
+# Docker Desktop bind mounts resolve Windows paths on the host. Avoid the
+# Linux-only local-volume driver_opts used by docker-compose.cvat.yml.
+services:
+  cvat_server:
+    labels:
+      # The server also joins the pipeline's network. Tell Traefik which of
+      # its addresses is reachable by the proxy instead of choosing at random.
+      traefik.docker.network: ${COMPOSE_PROJECT_NAME:-cvat}_cvat
+    networks:
+      cvat_network:
+        aliases:
+          - cvat-server
+    volumes:
+      - type: bind
+        source: ${MILA_CVAT_SHARE}
+        target: /home/django/share
+        read_only: true
+  cvat_worker_import:
+    volumes:
+      - type: bind
+        source: ${MILA_CVAT_SHARE}
+        target: /home/django/share
+        read_only: true
+  cvat_worker_export:
+    volumes:
+      - type: bind
+        source: ${MILA_CVAT_SHARE}
+        target: /home/django/share
+        read_only: true
+  cvat_worker_annotation:
+    volumes:
+      - type: bind
+        source: ${MILA_CVAT_SHARE}
+        target: /home/django/share
+        read_only: true
+  cvat_worker_chunks:
+    volumes:
+      - type: bind
+        source: ${MILA_CVAT_SHARE}
+        target: /home/django/share
+        read_only: true
+networks:
+  cvat_network:
+    external: true

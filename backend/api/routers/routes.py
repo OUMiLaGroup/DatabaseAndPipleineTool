@@ -12,10 +12,6 @@ from services.route_service import RouteService
 from utilities.service_builder_utilities import build_delete_service, build_route_service
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s"
-)
 logger = logging.getLogger(__name__)
 
 routes_router = APIRouter(

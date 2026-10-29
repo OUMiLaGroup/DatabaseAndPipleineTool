@@ -13,6 +13,7 @@ WORKDIR /app
 
 # Run Setup script
 COPY open_pilot_download_worker/scripts/setup-openpilot.sh /app/scripts/setup-openpilot.sh
+COPY open_pilot_download_worker/scripts/configure_replay_dependencies.py /app/scripts/configure_replay_dependencies.py
 COPY open_pilot_download_worker/files/cereal_service_with_gps_kalman.py /app/files/cereal_service_with_gps_kalman.py
 
 RUN chmod +x /app/scripts/setup-openpilot.sh \

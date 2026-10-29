@@ -117,7 +117,7 @@ async def get_dataset_export_download(
         export_id=export_id
     )
     minio_service = MinioService()
-    filename = f"route_{dataset_export.route_id}_export_{dataset_export.export_id}.zip"
+    filename = f"route_{dataset_export.route_id.replace('|', '_')}_export_{dataset_export.export_id}.zip"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
     return StreamingResponse(
         minio_service.stream_object(

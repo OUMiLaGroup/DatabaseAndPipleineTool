@@ -1,0 +1,12 @@
+This file is for creating a list of ideas that we could improve the project with.
+
+1. An install launcher that installs all requirements and gets the project running without having to run through a readme or youtube video. (Michael)
+2. Removing the refresh button and instead making the code automatically detect when a refresh is needed. (Michael)
+3. Enabling the use of a gpu with Pytorch to make some aspects of the code faster. (Michael)
+4. Use threading to send multiple images for processing instead of one at a time. (Michael)
+
+5. Add separate instructions or notes for different OS systems, including Docker resource settings and CPU, RAM, and disk needed before starting. (Chi)
+6. Add an "Automate" button to the frontend that triggers a backend workflow running the full processing pipeline end to end: loading the route ID, downloading the route, running annotation processing, and uploading the results to CVAT. (Chi)
+
+7. Add pixel level mono camera depth to the label by implementing depth anything v3: https://github.com/ByteDance-Seed/depth-anything-3. With the pixel level depth, we can easily calculate the distance of each object later. (Dr. Bin Xu)
+8. Label each image with following two type of labels. This feature will help us pull specific type of images for our training, e.g., night time images or daytime image at intersections: Type one - intersection or not: "non-intersection", "signalized intersection", "unsignalized intersection";  Type two - day or night: "daytime", "night time". (Dr. Bin Xu)

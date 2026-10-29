@@ -35,6 +35,7 @@ export default function JobDefinitions() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["job-definitions"] });
     },
+    meta: { errorTitle: "Could not delete job definition" },
   });
 
   // On create, insert the real server-returned item immediately — no refetch needed

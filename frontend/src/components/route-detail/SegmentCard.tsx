@@ -3,6 +3,7 @@ import type { Segment } from "../../api/types";
 import { formatOffset, formatDuration } from "../../utils/formatters";
 import { SegmentThumbnail } from "./SegmentThumbnail";
 import { SegStatusBadge } from "./SegStatusBadge";
+import { FailureReason } from "../FailureReason";
 
 export function SegmentCard({ segment, onClick }: { segment: Segment; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
@@ -37,6 +38,10 @@ export function SegmentCard({ segment, onClick }: { segment: Segment; onClick: (
           <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "var(--text-secondary)" }}>{formatDuration(segment.durationSeconds)}</span>
           <span style={{ fontFamily: "var(--font-mono)", fontSize: "10px", color: "var(--text-muted)" }}>{segment.frameCount.toLocaleString()} fr</span>
         </div>
+        {segment.status === "failed" && segment.error ? (
+          // The card is clickable, so show the reason as one line with a tooltip
+          <FailureReason text={segment.error} variant="compact" maxWidth="100%" />
+        ) : (
         <div style={{ fontSize: "9px", fontFamily: "var(--font-mono)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
           {segment.status === "failed"
             ? "— processing failed"
@@ -46,6 +51,7 @@ export function SegmentCard({ segment, onClick }: { segment: Segment; onClick: (
             ? "— uploaded"
             : "— pending"}
         </div>
+        )}
       </div>
     </div>
   );
